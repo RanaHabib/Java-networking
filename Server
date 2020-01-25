@@ -1,0 +1,275 @@
+package Project;
+
+import java.io.*;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.nio.file.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Scanner;
+
+public class Server {
+
+    public static void main(String[] args) {
+        try {
+            // Initialize Server Socket with port number one, to pass control information.
+            ServerSocket svrPort1 = new ServerSocket(1000);
+
+            // Initialize server socket with port number two, to send data files to clients.
+            ServerSocket svrPort2 = new ServerSocket(2000);
+
+            System.out.println("Server is booted up and is waiting for clients to connect.");
+
+            while (true) {
+                // Accept any Client wants to connect to port 1.
+                Socket ClientSocket1 = svrPort1.accept();
+                System.out.println("A new client [" + svrPort1 + "] is connected to the server port 1.");
+
+                //Create a new thread for this client on port 1
+                Thread client = new HandleUserNameAndPassword(ClientSocket1);
+                client.start();
+
+                //Accept any Client wants to` connect to port 2.
+                Socket ClientSocket2 = svrPort2.accept();
+                System.out.println("A new client [" + svrPort2 + "] is connected to the server port 2.");
+
+                //Create a new thread for this client on port 2
+                new ClientConnection(ClientSocket2, ((HandleUserNameAndPassword) client).getNumber()).start();
+            }
+        } catch (IOException e) {
+            System.out.println("Problem with Server Socket.");
+        }
+    }
+
+
+    //For handling username and password
+    static class HandleUserNameAndPassword extends Thread {
+        final private Socket ClientSocket1;
+        private static String number;
+
+        HandleUserNameAndPassword(Socket ClientSocket1) {
+            this.ClientSocket1 = ClientSocket1;
+        }
+
+        public static String getNumber() {
+            return number;
+        }
+
+        public static void setNumber(String number) {
+            HandleUserNameAndPassword.number = number;
+        }
+
+        public void run() {
+            try {
+                Scanner text = new Scanner(new File("C:\\networks\\UserNameAndPassword.txt"));
+
+                // Take input from the server by using the client socket.
+                DataInputStream input = new DataInputStream(ClientSocket1.getInputStream());
+
+                // Print output to the server by using the client socket.
+                DataOutputStream output = new DataOutputStream(ClientSocket1.getOutputStream());
+
+                // Send to the client that it is now connected.
+                output.writeUTF("connected on port one.");
+
+                //Requesting Username and Password.
+                output.writeUTF("Send your Username");
+
+                // Read the request from the client and output it to Server's console.
+                String requestUserName = input.readUTF();
+                System.out.println("Client [ " + ClientSocket1 + " ]: " + requestUserName);
+
+                //reading from the file
+                String Name, Password = null;
+                boolean IsExisted = false;
+
+                while (text.hasNext()) {
+                    setNumber(text.next());
+                    Name = text.next();
+                    Password = text.next();
+
+                    if (Name.equalsIgnoreCase(requestUserName)) {
+                        IsExisted = true;
+                        break;
+                    }
+                }
+                if (!IsExisted) {
+                    output.writeUTF("Username does not exist, commencing termination");
+                    System.out.println("Closing connection with this client....");
+                    System.out.println("Connection with this client [" + ClientSocket1 + "] is closed.");
+                    ClientSocket1.close();
+                } else {
+                    output.writeUTF("Username exists");
+                    output.writeUTF("Send your password");
+
+                    // Read the request password from the client and output it to Server's console.
+                    String requestPassword = input.readUTF();
+
+                    if (Password.equalsIgnoreCase(requestPassword)) {
+                        //Output username and password are correct.
+                        output.writeUTF("Password correct, ready to connect on port two.");
+
+                    } else {
+                        output.writeUTF("Password is not correct, commencing termination.");
+                        System.out.println("Closing connection with this client....");
+                        System.out.println("Connection with this client [" + ClientSocket1 + "] is closed.");
+                        ClientSocket1.close();
+                    }
+                }
+
+                // Close the objects.
+                input.close();
+                output.close();
+
+            } catch (IOException e) {
+                System.out.println("Error");
+                e.printStackTrace();
+            }
+        }
+    }
+
+
+    // For Handling User requests
+    static class ClientConnection extends Thread {
+
+        final private Socket ClientSocket2;
+        private String number;
+
+        public ClientConnection(Socket ClientSocket2, String number) {
+            this.ClientSocket2 = ClientSocket2;
+            this.number = number;
+        }
+
+        public synchronized void run() {
+            try {
+                synchronized (this) {
+                    // Takes input from the client socket.
+                    DataInputStream in = new DataInputStream(ClientSocket2.getInputStream());
+
+                    // Print output to the client socket.
+                    DataOutputStream out = new DataOutputStream(ClientSocket2.getOutputStream());
+
+                    // Send to the client that it is now connected(confirm message).
+                    String confirmMSG = "connected on port two.";
+                    out.writeUTF(confirmMSG);
+
+                    // Start communication with client.
+                    while (true) {
+                        out.writeUTF("enter 1 for show directories or 'close' to close the connection.");
+
+                        //Read the request from the client and output it to Server's console.(client sends show my directories or close)
+                        String request = in.readUTF();
+                        System.out.println("Client [ " + ClientSocket2 + " ]: " + request);
+
+                        // Close the connection with this client.
+                        if (request.equals("close")) {
+                            System.out.println("Closing connection with this client....");
+                            System.out.println("Connection with this client [" + ClientSocket2 + "] is closed.");
+                            ClientSocket2.close();
+                            break;
+                        } else if (request.equalsIgnoreCase("1")) {
+                            //creates a new file instance
+                            File myfile = new File("C:\\networks\\dirs.txt");
+                            String tempNumber, tempDirs;
+
+                            FileReader fr = new FileReader(myfile);
+                            BufferedReader lineReader = new BufferedReader(fr);
+                            String line;
+
+                            //Outputting all directories
+                            while ((line = lineReader.readLine()) != null) {
+                                Scanner text = new Scanner(line);
+
+                                tempNumber = text.next();
+                                if (tempNumber.equalsIgnoreCase(number)) {
+                                    while (text.hasNext()) {
+                                        tempDirs = text.next();
+                                        out.writeUTF(tempDirs);
+                                    }
+                                    out.writeUTF("end of directories");
+                                    break;
+                                }
+                            }
+
+                            //request directory
+                            out.writeUTF("please send the required directory");
+
+                            //take the requested directory
+                            String requestDirs = in.readUTF();
+
+                            //Outputting the requested directory files
+                            Path dir = Paths.get(requestDirs);
+
+                            StringBuilder s = new StringBuilder();
+                            try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
+
+                                for (Path file : stream) {
+                                    //s = String.valueOf(file.getFileName());
+                                    //System.out.println(s);
+                                    s.append(file.getFileName());
+                                    s.append("\n");
+                                }
+                            } catch (Exception e) {
+                                System.err.println(e);
+                            }
+
+
+                            out.writeUTF(String.valueOf(s));
+                            out.writeUTF("end of available directories");
+
+                            //Server asking for the client to enter the targeted file
+                            String ask = "Please enter the targeted text file";
+                            out.writeUTF(ask);
+
+                            //reading the targeted file
+                            String TargetedFile = in.readUTF();
+
+                            //Uploading file content
+                            File TargetFile = new File(TargetedFile);
+
+                            FileReader buff = new FileReader(TargetFile);
+                            BufferedReader lineReaderbuff = new BufferedReader(buff);
+                            String Line;
+
+/*                                                       out.writeUTF("File Content:");
+
+ StringBuilder FileLine = new StringBuilder();
+                            //Outputting all file content
+                            while ((Line = lineReaderbuff.readLine()) != null) {
+                                //out.writeUTF(Line);
+                                FileLine.append(Line);
+                                FileLine.append("\n");
+
+                            }*/
+                            byte[] array = Files.readAllBytes(Paths.get(TargetedFile));
+
+                            //out.writeUTF("file: \n");
+                            System.out.println(new String(array));
+                            out.write(array);
+                            out.flush();
+
+                            //out.writeUTF(String.valueOf(FileLine));
+                            //out.writeUTF("end of file");
+
+
+                        } else {
+                            out.writeUTF("Command is unknown, commencing termination");
+                            System.out.println("Closing connection with this client....");
+                            System.out.println("Connection with this client [" + ClientSocket2 + "] is closed.");
+                            ClientSocket2.close();
+                        }
+
+                    }
+
+                    // Close the objects.
+                    in.close();
+                    out.close();
+                }
+            } catch (IOException e) {
+                System.out.println("error, Connection with this client [" + ClientSocket2 + "] is terminated.");
+            }
+        }
+    }
+}
+
+
