@@ -1,0 +1,169 @@
+package Project;
+
+import java.io.*;
+import java.net.InetAddress;
+import java.net.Socket;
+import java.util.Scanner;
+
+public class Client {
+
+    public static void main(String[] args) {
+
+        try {
+            // Get the ip address of the local host and send it the socket with the server port number 1
+            InetAddress ip = InetAddress.getByName("localhost");
+            Socket clientSocket1 = new Socket(ip, 1000);
+
+            System.out.println("Connecting to the server on port number 1....");
+
+            // Take input from the server by using the client socket.
+            DataInputStream input = new DataInputStream(clientSocket1.getInputStream());
+
+            // Print output to the server by using the client socket.
+            DataOutputStream output = new DataOutputStream(clientSocket1.getOutputStream());
+
+            // Take input from console.
+            Scanner scanner = new Scanner(System.in);
+
+            // Read from the server that the client is now connected and print it.
+            String connectConfirm = input.readUTF();
+            System.out.println("Server: " + connectConfirm);
+
+            // Start communication with server.
+            while (true) {
+                // Read from the server the message that was asking for the request and print it.
+                String serverAsk = input.readUTF();
+                System.out.println("Server: " + serverAsk);
+
+                // Write the requested message and send it to the server.
+                String request = scanner.nextLine();
+                output.writeUTF(request);
+
+                // Close the connection with the server.
+                if (request.equals("close")) {
+                    System.out.println("Closing connection to server....");
+                    clientSocket1.close();
+                    System.out.println("connection is closed.");
+                    break;
+                }
+
+                // Read the server reply and print it.
+                String reply = input.readUTF();
+                System.out.println("Server: " + reply);
+                if (reply.equalsIgnoreCase("Password correct, ready to connect on port two.")) break;
+            }
+
+            // Close the objects.
+            //scanner.close();
+            input.close();
+            output.close();
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+            // Get the ip address of the local host and send it the socket with the server port number 2
+            Socket clientSocket2 = new Socket(ip, 2000);
+            System.out.println("Connecting to the server on port number 2....");
+
+            InputStream is = clientSocket2.getInputStream();
+            // Take input from the server by using the client socket.
+            DataInputStream in = new DataInputStream(is);
+
+            // Print output to the server by using the client socket.
+            DataOutputStream out = new DataOutputStream(clientSocket2.getOutputStream());
+
+            // Take input from console.
+            Scanner scan = new Scanner(System.in);
+
+            // Read from the server that the client is now connected and print it(confirm message).
+            String serverConfirm = in.readUTF();
+            System.out.println("Server: " + serverConfirm);
+
+            // Start communication with server.
+            while (true) {
+                // Read from the server the message that was asking for the request and print it.
+                String SvrAsk = in.readUTF();
+                System.out.println("Server: " + SvrAsk);
+
+                // Write the requested message and send it to the server(sending show my directories or close).
+                String MyRequest = scan.nextLine();
+                out.writeUTF(MyRequest);
+
+                // Close the connection with the server.
+                if (MyRequest.equals("close")) {
+                    System.out.println("Closing connection to server....");
+                    clientSocket1.close();
+                    System.out.println("connection is closed.");
+                    break;
+                } else {
+                    //read the dirs from server
+                    // Read the server reply and print it.
+                    String reply;
+                    do {
+                        reply = in.readUTF();
+                        System.out.println("Server: " + reply);
+                    } while (!reply.equalsIgnoreCase("end of directories"));
+
+                    //read server answer
+                    //read files available in the directory
+                    System.out.println("Server: " + in.readUTF());
+
+                    //request directory
+                    out.writeUTF(scan.nextLine());
+
+                    //read files available in the directory
+                    do {
+                        System.out.println(in.readUTF());
+                    } while (!((in.readUTF()).equalsIgnoreCase("end of available directories")));
+
+                    //read server answer
+                    System.out.println("Server: " + in.readUTF());
+
+                    while (is.read() > 0) {
+                    }
+
+                    //request a file
+                    out.writeUTF(scan.nextLine());
+
+                    //read the content(download) and write to a file
+                    File mFile = new File("C:\\Users\\Zoey\\IdeaProjects\\Project\\client.txt");
+                    FileOutputStream fos = new FileOutputStream(mFile);
+
+                    StringBuilder content = new StringBuilder();
+
+                    int readBytes;
+                    byte[] txt = new byte[1024];
+
+
+                    while ((readBytes = is.read(txt)) > 0) {
+                        content.append("Server: ");
+                        content.append(new String(txt));
+                        content.append("\n");
+                    }
+                    if (mFile.createNewFile()) {
+                        fos.write(content.toString().getBytes());
+                        fos.flush();
+                        fos.close();
+                    }
+
+                    //reading request
+                    //System.out.println("Server: " + in.readUTF());
+
+                    //sending close
+                    //out.writeUTF(scan.nextLine());
+
+                }
+            }
+
+            // Close the objects.
+            scan.close();
+            in.close();
+            out.close();
+
+
+        } catch (Exception e) {
+            System.out.println("Error, Connection with server is terminated.");
+        }
+
+    }
+
+}
